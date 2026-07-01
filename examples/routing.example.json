@@ -1,0 +1,7 @@
+{
+  "chat_id": "-100XXXXXXXXXX",
+  "topics": {
+    "101": { "name": "Project A", "project_dir": "/home/user/projects/project-a" },
+    "102": { "name": "Project B", "project_dir": "/home/user/projects/project-b" }
+  }
+}

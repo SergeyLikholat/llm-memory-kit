@@ -41,7 +41,9 @@ mkdir -p "$CLAUDE_DIR/projects/-root/memory/activity" "$PROJECTS_DIR"
 # 4) cron
 CRON_CORE="30 2 * * * /usr/bin/node $DIR/core/digest.js >> $DIR/core/digest.log 2>&1
 45 2 * * * $DIR/core/memory-cron.sh
-*/30 3-23 * * * $DIR/core/memory-cron.sh"
+*/30 3-23 * * * $DIR/core/memory-cron.sh
+55 2 * * * $DIR/core/entity-cron.sh
+*/30 3-23 * * * $DIR/core/entity-cron.sh"
 CRON_OBS=""
 [ -n "$OBSIDIAN_DIR" ] && CRON_OBS="50 2 * * * $DIR/obsidian/obsidian-cron.sh
 */30 3-23 * * * $DIR/obsidian/obsidian-cron.sh"

@@ -71,10 +71,20 @@ ${Object.entries(cat).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 ЗАПИСИ:
 ${JSON.stringify(items, null, 1).slice(0, 50000)}`;
 
-  let parsed;
-  try { const raw = callClaude(prompt); parsed = extractJSON(raw); }
-  catch (e) { log(`LLM недоступен (${e.message}) — буферы не трогаю, повтор позже`); return; }
-  const assign = {}; for (const a of (parsed.assign || [])) assign[a.id] = a;
+  const BATCH = 10;
+  const assign = {};
+  for (let i = 0; i < items.length; i += BATCH) {
+    const chunk = items.slice(i, i + BATCH);
+    const p = prompt.replace(/ЗАПИСИ:\n[\s\S]*$/, 'ЗАПИСИ:\n' + JSON.stringify(chunk, null, 1).slice(0, 40000));
+    let parsed;
+    try { const raw = callClaude(p); parsed = extractJSON(raw); }
+    catch (e) {
+      if (String(e.message) === 'LIMIT') { log('лимит подписки — буферы не трогаю, повтор позже'); return; }
+      log(`батч ${i / BATCH + 1}: ошибка (${e.message}) — пропуск батча`); continue;
+    }
+    for (const a of (parsed.assign || [])) assign[a.id] = a;
+    log(`  батч ${i / BATCH + 1}/${Math.ceil(items.length / BATCH)}: ${(parsed.assign || []).length} решений`);
+  }
 
   const byProj = {}; const keep = [];
   blocks.forEach((b, i) => {

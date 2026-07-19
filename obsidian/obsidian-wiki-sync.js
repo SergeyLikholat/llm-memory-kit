@@ -14,22 +14,25 @@ const DRY = process.argv.includes('--dry-run');
 const log = (...a) => console.log('[obsidian-sync ' + new Date().toISOString() + ']', ...a);
 const git = (...args) => spawnSync('git', ['-C', VAULT, ...args], { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 });
 
+// Маппинг «префикс папки волта → домен» задаётся пользователем через MEMKIT_OBSIDIAN_DOMAINS
+// (JSON: {"Projects/":"projects", "Areas/":"areas", ...}), т.к. структура волта у каждого своя.
+// Более длинный (специфичный) префикс имеет приоритет. Не задан → домен по первому сегменту пути.
+const DOMAIN_MAP = (() => {
+  try { return JSON.parse(process.env.MEMKIT_OBSIDIAN_DOMAINS || '{}'); } catch { return {}; }
+})();
+const DOMAIN_PREFIXES = Object.keys(DOMAIN_MAP).sort((a, b) => b.length - a.length);
 function domainOf(rel) {
-  if (rel.startsWith('1. Мой жизненный план/')) return 'жизненный-план';
-  if (rel.startsWith('2. Категории для улучшения/Личные/')) return 'личное';
-  if (rel.startsWith('2. Категории для улучшения/Профессиональные/')) return 'профессиональное';
-  if (rel.startsWith('3. Проекты/ТК инжиниринг/')) return 'тк-инжиниринг';
-  if (rel.startsWith('3. Проекты/')) return 'проекты';
-  if (rel.startsWith('4. Ресурсы/')) return 'ресурсы';
-  if (rel.startsWith('!Входящее/')) return 'входящее';
-  return null;
+  for (const p of DOMAIN_PREFIXES) if (rel.startsWith(p)) return DOMAIN_MAP[p];
+  const seg = rel.split('/')[0];                    // фолбэк: верхняя папка как домен
+  return seg && seg !== rel ? seg.toLowerCase().replace(/\s+/g, '-') : null;
 }
 class LimitError extends Error {}
 function callClaude(prompt) {
   const tmp = path.join('/tmp', 'obs-' + process.pid + '-' + Date.now() + '.txt');
   fs.writeFileSync(tmp, prompt);
   try {
-    const r = spawnSync('bash', ['-c', `cat ${JSON.stringify(tmp)} | ${CLAUDE} -p --output-format json --no-session-persistence`], { encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024, cwd: '/tmp' });
+    const MODEL = process.env.MEMKIT_MODEL || 'sonnet';
+    const r = spawnSync('bash', ['-c', `cat ${JSON.stringify(tmp)} | ${CLAUDE} -p --model ${MODEL} --output-format json --no-session-persistence`], { encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024, cwd: '/tmp' });
     let o = null; try { o = JSON.parse(r.stdout || ''); } catch {}
     const aes = o ? String(o.api_error_status || '') : '', sub = o ? String(o.subtype || '') : '';
     if (/limit|rate|429|overload/i.test(aes) || /limit|rate/i.test(sub) || /usage limit/i.test(r.stdout || '')) throw new LimitError(aes || sub);

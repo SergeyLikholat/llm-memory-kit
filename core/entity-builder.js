@@ -27,7 +27,8 @@ function callClaude(prompt) {
   const tmp = path.join('/tmp', 'ent-' + process.pid + '-' + Date.now() + '.txt');
   fs.writeFileSync(tmp, prompt);
   try {
-    const r = spawnSync('bash', ['-c', `cat ${JSON.stringify(tmp)} | ${CLAUDE} -p --output-format json --no-session-persistence`], { encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024, cwd: '/tmp' });
+    const MODEL = process.env.MEMKIT_MODEL || 'sonnet';
+    const r = spawnSync('bash', ['-c', `cat ${JSON.stringify(tmp)} | ${CLAUDE} -p --model ${MODEL} --output-format json --no-session-persistence`], { encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024, cwd: '/tmp' });
     let o = null; try { o = JSON.parse(r.stdout || ''); } catch {}
     const aes = o ? String(o.api_error_status || '') : '', sub = o ? String(o.subtype || '') : '';
     if (/limit|rate|429|overload/i.test(aes) || /limit|rate/i.test(sub) || /usage limit/i.test(r.stdout || '')) throw new LimitError(aes || sub);
@@ -66,9 +67,9 @@ function buildPrompt(nodes) {
   return `Ты строишь ГРАФ ИМЕНОВАННЫХ СУЩНОСТЕЙ поверх памяти — чтобы горизонтально связать узлы, где встречается одна и та же сущность. Язык русский.
 
 ЧТО ВЫДЕЛЯТЬ (приоритет сверху вниз):
-1. ЛЮДИ — конкретные имена/фамилии: заказчики, коллеги, подрядчики, клиенты, врачи (напр. «Виктория Герасименко», «Михеев», «Панасюк»).
-2. ОБЪЕКТЫ — конкретные строительные/клиентские объекты (напр. «Академия Хоккея», «Республика»).
-3. ОРГАНИЗАЦИИ — компании-контрагенты (напр. «ТК Инжиниринг», «КСР Бау», «Теплоспектр»).
+1. ЛЮДИ — конкретные имена/фамилии: заказчики, коллеги, подрядчики, клиенты, врачи.
+2. ОБЪЕКТЫ — конкретные именованные объекты/площадки/продукты, вокруг которых идёт работа.
+3. ОРГАНИЗАЦИИ — компании-контрагенты, заказчики, поставщики.
 4. ИНСТРУМЕНТЫ — ТОЛЬКО ключевые доменные платформы, которые реально связывают несколько узлов (напр. «Plane», «n8n»).
 
 ЧЕГО НЕ ВЫДЕЛЯТЬ (важно, иначе каша):
